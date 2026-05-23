@@ -11,7 +11,7 @@ export async function registerUser(input) {
   return withTransaction(async (client) => {
     const existingUser = await findUserByEmail(input.email);
     if (existingUser) {
-      throw new AppError("Email is already registered", 409, "EMAIL_EXISTS");
+      throw new AppError("Unable to complete the request.", 409, "REGISTRATION_FAILED");
     }
 
     const passwordHash = await bcrypt.hash(input.password, 12);
