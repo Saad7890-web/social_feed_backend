@@ -1,6 +1,5 @@
-import { v2 as cloudinary } from "cloudinary";
 import crypto from "crypto";
-import path from "path";
+import { cloudinary } from "../../config/cloudinary.js";
 import { env } from "../../config/env.js";
 import { AppError } from "../../utils/AppError.js";
 
@@ -8,66 +7,74 @@ const MIME_TO_EXT = {
   "image/jpeg": "jpg",
   "image/png": "png",
   "image/webp": "webp",
-  "image/gif": "gif",
+  "image/gif": "gif"
 };
 
-export function buildImagePublicId({ userId, contentType }) {
-  const ext = MIME_TO_EXT[contentType];
-  if (!ext) {
-    throw new AppError("Unsupported image type", 400, "INVALID_FILE_TYPE");
-  }
-
-  const fileId = crypto.randomUUID();
-  return `posts/${userId}/${fileId}.${ext}`;
+function buildFolder(userId, visibility) {
+  return `${env.CLOUDINARY_FOLDER}/users/${userId}/${visibility}`;
 }
 
-export async function createImageUpload({
-  userId,
-  fileName,
-  contentType,
-  size,
-  buffer,
-}) {
+function buildPublicId(userId, visibility) {
+  return `${buildFolder(userId, visibility)}/${Date.now()}-${crypto.randomUUID()}`;
+}
+
+function getDeliveryType(visibility) {
+  return visibility === "private" ? "authenticated" : "upload";
+}
+
+export function createCloudinaryUploadSignature({ userId, fileName, contentType, size, visibility }) {
   if (size > env.MAX_IMAGE_SIZE_BYTES) {
     throw new AppError("Image is too large", 400, "FILE_TOO_LARGE");
   }
 
-  const publicId = buildImagePublicId({ userId, contentType });
+  const ext = MIME_TO_EXT[contentType];
+  if (!ext) {
+    throw new AppError("Only JPG, PNG, WEBP, or GIF images are allowed", 400, "INVALID_FILE_TYPE");
+  }
 
-  const uploaded = await new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(
-      {
-        folder: env.CLOUDINARY_FOLDER,
-        public_id: publicId,
-        resource_type: "image",
-        overwrite: false,
-      },
-      (error, result) => {
-        if (error) return reject(error);
-        resolve(result);
-      }
-    );
+  const folder = buildFolder(userId, visibility);
+  const public_id = buildPublicId(userId, visibility);
+  const type = getDeliveryType(visibility);
+  const timestamp = Math.floor(Date.now() / 1000);
 
-    stream.end(buffer);
-  });
+  const paramsToSign = {
+    timestamp,
+    folder,
+    public_id,
+    type,
+    resource_type: "image"
+  };
+
+  const signature = cloudinary.utils.api_sign_request(paramsToSign, env.CLOUDINARY_API_SECRET);
 
   return {
-    imageKey: uploaded.public_id,
-    uploadUrl: uploaded.secure_url,
-    publicId: uploaded.public_id,
-    contentType,
-    size,
-    fileName: path.basename(fileName || "image"),
+    cloudName: env.CLOUDINARY_CLOUD_NAME,
+    apiKey: env.CLOUDINARY_API_KEY,
+    uploadUrl: `https://api.cloudinary.com/v1_1/${env.CLOUDINARY_CLOUD_NAME}/image/upload`,
+    timestamp,
+    signature,
+    folder,
+    publicId: public_id,
+    deliveryType: type,
+    resourceType: "image",
+    maxImageSizeBytes: env.MAX_IMAGE_SIZE_BYTES,
+    allowedContentTypes: Object.keys(MIME_TO_EXT),
+    fileName: fileName.replace(/[^\w.\- ]+/g, "_")
   };
 }
 
-export async function createSignedImageUrl(imageKey) {
-  if (!imageKey) {
-    throw new AppError("Image not found", 404, "NOT_FOUND");
+export function verifyCloudinaryUploadResult(upload) {
+  const expectedSignature = cloudinary.utils.api_sign_request(
+    {
+      public_id: upload.publicId,
+      version: upload.version
+    },
+    env.CLOUDINARY_API_SECRET
+  );
+
+  if (expectedSignature !== upload.signature) {
+    throw new AppError("Invalid image upload", 400, "INVALID_IMAGE_UPLOAD");
   }
 
-  return cloudinary.url(imageKey, {
-    secure: true,
-    resource_type: "image",
-  });
+  return true;
 }
