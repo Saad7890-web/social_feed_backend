@@ -34,3 +34,29 @@ export async function createUser(client, { firstName, lastName, email, passwordH
 
   return result.rows[0];
 }
+
+export async function findUsersByIds(ids) {
+  if (!Array.isArray(ids) || ids.length === 0) return [];
+
+  const result = await query(
+    `SELECT id, first_name, last_name, email, created_at
+     FROM users
+     WHERE id = ANY($1::bigint[])`,
+    [ids]
+  );
+
+  return result.rows;
+}
+
+export async function findPublicUsersByIds(ids) {
+  if (!Array.isArray(ids) || ids.length === 0) return [];
+
+  const result = await query(
+    `SELECT id, first_name, last_name, created_at
+     FROM users
+     WHERE id = ANY($1::bigint[])`,
+    [ids]
+  );
+
+  return result.rows;
+}
