@@ -1,5 +1,5 @@
-
 import { withTransaction } from "../../db/pool.js";
+import { getPostLikeSummaries } from "../../repositories/like.repository.js";
 import {
   createPost,
   deletePost,
@@ -9,6 +9,7 @@ import {
   updatePost
 } from "../../repositories/post.repository.js";
 import { AppError } from "../../utils/AppError.js";
+import { buildCloudinaryImageUrl } from "../../utils/cloudinary-delivery.js";
 import { encodeCursor } from "../../utils/pagination.js";
 import { serializePost } from "../../utils/post-serializers.js";
 import { verifyCloudinaryUploadResult } from "../uploads/upload.service.js";
@@ -32,6 +33,15 @@ function normalizeImage(image, visibility) {
     imageHeight: image.height ?? null,
     imageFormat: image.format ?? null,
     imageBytes: image.bytes ?? null
+  };
+}
+
+function normalizeLikeSummary(row) {
+  return {
+    entityId: Number(row.entity_id),
+    likeCount: Number(row.like_count || 0),
+    likedByMe: Boolean(row.liked_by_me),
+    likersPreview: Array.isArray(row.likers_preview) ? row.likers_preview : []
   };
 }
 
@@ -80,7 +90,6 @@ export async function removePost(userId, postId) {
     }
 
     await deletePost(client, postId);
-
     return true;
   });
 }
@@ -88,7 +97,27 @@ export async function removePost(userId, postId) {
 export async function getFeed(userId, { limit, cursor }) {
   const rows = await listFeedPosts({ userId, limit, cursor });
 
-  const posts = rows.map(serializePost);
+  const postIds = rows.map((row) => Number(row.id));
+  const likeRows = postIds.length > 0
+    ? await getPostLikeSummaries(postIds, userId, 3)
+    : [];
+
+  const likeMap = new Map(
+    likeRows.map((row) => [Number(row.entity_id), normalizeLikeSummary(row)])
+  );
+
+  const posts = rows.map((row) => {
+    const imageUrl = row.image_key
+      ? buildCloudinaryImageUrl({
+          publicId: row.image_key,
+          deliveryType: row.image_delivery_type,
+          version: row.image_version
+        })
+      : null;
+
+    return serializePost(row, likeMap.get(Number(row.id)) || null, imageUrl);
+  });
+
   const nextCursor =
     posts.length === limit
       ? encodeCursor({
@@ -114,5 +143,16 @@ export async function getPostByIdForCurrentUser(userId, postId) {
     throw new AppError("Post not found", 404, "NOT_FOUND");
   }
 
-  return serializePost(post);
+  const likeRows = await getPostLikeSummaries([Number(post.id)], userId, 3);
+  const likeSummary = likeRows[0] ? normalizeLikeSummary(likeRows[0]) : null;
+
+  const imageUrl = post.image_key
+    ? buildCloudinaryImageUrl({
+        publicId: post.image_key,
+        deliveryType: post.image_delivery_type,
+        version: post.image_version
+      })
+    : null;
+
+  return serializePost(post, likeSummary, imageUrl);
 }

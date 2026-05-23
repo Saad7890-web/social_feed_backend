@@ -1,4 +1,4 @@
-// post.repository.js
+
 import { query } from "../db/pool.js";
 
 const POST_SELECT_COLUMNS = `
@@ -185,11 +185,10 @@ export async function deletePost(client, postId) {
 export async function listFeedPosts({ userId, limit, cursor }) {
   const params = [userId, limit];
   let cursorClause = "";
-  let cursorIndex = 3;
 
   if (cursor) {
     params.push(cursor.createdAt, cursor.id);
-    cursorClause = `AND (p.created_at, p.id) < ($${cursorIndex++}::timestamptz, $${cursorIndex++}::bigint)`;
+    cursorClause = `AND (p.created_at, p.id) < ($3::timestamptz, $4::bigint)`;
   }
 
   const result = await query(
@@ -201,10 +200,6 @@ export async function listFeedPosts({ userId, limit, cursor }) {
       p.image_key,
       p.image_delivery_type,
       p.image_version,
-      p.image_width,
-      p.image_height,
-      p.image_format,
-      p.image_bytes,
       p.visibility,
       p.like_count,
       p.comment_count,
@@ -212,12 +207,7 @@ export async function listFeedPosts({ userId, limit, cursor }) {
       p.updated_at,
       u.first_name AS author_first_name,
       u.last_name AS author_last_name,
-      u.created_at AS author_created_at,
-      EXISTS (
-        SELECT 1
-        FROM post_likes pl
-        WHERE pl.post_id = p.id AND pl.user_id = $1
-      ) AS liked_by_me
+      u.created_at AS author_created_at
     FROM posts p
     JOIN users u ON u.id = p.author_id
     WHERE (
