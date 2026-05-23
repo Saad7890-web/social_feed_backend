@@ -1,5 +1,6 @@
 import { Router } from "express";
 import authRoutes from "../modules/auth/auth.routes.js";
+import commentRoutes from "../modules/comments/comment.routes.js";
 import likeRoutes from "../modules/likes/like.routes.js";
 import postRoutes from "../modules/posts/post.routes.js";
 import uploadRoutes from "../modules/uploads/upload.routes.js";
@@ -17,5 +18,6 @@ router.use("/security", securityRoutes);
 router.use("/users", userRoutes);
 router.use("/uploads", uploadRoutes);
 router.use("/", likeRoutes);
+router.use("/", commentRoutes);
 
 export default router;
