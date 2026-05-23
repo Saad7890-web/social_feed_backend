@@ -12,6 +12,9 @@ const envSchema = z.object({
   COOKIE_SECURE: z.string().transform((v) => v === "true").default("false"),
   COOKIE_SAMESITE: z.enum(["lax", "strict", "none"]).default("lax"),
   COOKIE_DOMAIN: z.string().optional().default(""),
+  CSRF_COOKIE_NAME: z.string().min(1).default("sf_csrf"),
+  GLOBAL_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(15 * 60 * 1000),
+  GLOBAL_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(600),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info")
 });
 
