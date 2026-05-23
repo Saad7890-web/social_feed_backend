@@ -4,6 +4,7 @@ import { createSession, revokeSessionByTokenHash } from "../../repositories/sess
 import { createUser, findUserByEmail, findUserById } from "../../repositories/user.repository.js";
 import { AppError } from "../../utils/AppError.js";
 import { createSessionToken, hashSessionToken } from "../../utils/crypto.js";
+import { serializeUser } from "../../utils/serializers.js";
 
 const SESSION_DAYS = 30;
 
@@ -11,7 +12,7 @@ export async function registerUser(input) {
   return withTransaction(async (client) => {
     const existingUser = await findUserByEmail(input.email);
     if (existingUser) {
-      throw new AppError("Unable to complete the request.", 409, "REGISTRATION_FAILED");
+      throw new AppError("Unable to complete the request.", 400, "REGISTRATION_FAILED");
     }
 
     const passwordHash = await bcrypt.hash(input.password, 12);
@@ -25,7 +26,6 @@ export async function registerUser(input) {
 
     const rawToken = createSessionToken();
     const tokenHash = hashSessionToken(rawToken);
-
     const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
 
     await createSession(client, {
@@ -34,9 +34,10 @@ export async function registerUser(input) {
       expiresAt
     });
 
-    return { user, rawToken };
+    return { user: serializeUser(user), rawToken };
   });
 }
+
 
 export async function loginUser(input) {
   const user = await findUserByEmail(input.email);
@@ -62,7 +63,7 @@ export async function loginUser(input) {
 
     const safeUser = await findUserById(user.id);
 
-    return { user: safeUser, rawToken };
+    return { user: serializeUser(safeUser), rawToken };
   });
 }
 
