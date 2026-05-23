@@ -16,13 +16,10 @@ const envSchema = z.object({
   GLOBAL_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(15 * 60 * 1000),
   GLOBAL_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(600),
 
-  STORAGE_BUCKET: z.string().min(1),
-  STORAGE_REGION: z.string().min(1),
-  STORAGE_ACCESS_KEY_ID: z.string().min(1),
-  STORAGE_SECRET_ACCESS_KEY: z.string().min(1),
-  STORAGE_ENDPOINT: z.string().url().optional().default(""),
-  STORAGE_FORCE_PATH_STYLE: z.string().transform((v) => v === "true").default("false"),
-  STORAGE_URL_EXPIRES_SECONDS: z.coerce.number().int().positive().default(300),
+  CLOUDINARY_CLOUD_NAME: z.string().min(1),
+  CLOUDINARY_API_KEY: z.string().min(1),
+  CLOUDINARY_API_SECRET: z.string().min(1),
+  CLOUDINARY_FOLDER: z.string().min(1).default("social-feed"),
   MAX_IMAGE_SIZE_BYTES: z.coerce.number().int().positive().default(8 * 1024 * 1024),
 
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info")
