@@ -1,9 +1,12 @@
 import { createApp } from "./app.js";
 import { env } from "./config/env.js";
 import { logger } from "./config/logger.js";
+import { closeRedis, initRedis } from "./config/redis.js";
 import { pool } from "./db/pool.js";
 
 const app = createApp();
+
+await initRedis();
 
 const server = app.listen(env.PORT, () => {
   logger.info({ port: env.PORT, env: env.NODE_ENV }, "Server started");
@@ -14,8 +17,9 @@ async function shutdown(signal) {
 
   server.close(async () => {
     try {
+      await closeRedis();
       await pool.end();
-      logger.info("Database pool closed");
+      logger.info("Resources closed");
       process.exit(0);
     } catch (err) {
       logger.error({ err }, "Shutdown error");

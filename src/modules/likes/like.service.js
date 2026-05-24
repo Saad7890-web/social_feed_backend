@@ -1,11 +1,12 @@
 import {
-    getCommentLikeSummary,
-    getPostLikeSummary,
-    likeCommentForUser,
-    likePostForUser,
-    unlikeCommentForUser,
-    unlikePostForUser
+  getCommentLikeSummary,
+  getPostLikeSummary,
+  likeCommentForUser,
+  likePostForUser,
+  unlikeCommentForUser,
+  unlikePostForUser
 } from "../../repositories/like.repository.js";
+import { cacheDel } from "../../services/cache.service.js";
 import { AppError } from "../../utils/AppError.js";
 
 export async function likePost(userId, postId, previewLimit = 3) {
@@ -14,6 +15,10 @@ export async function likePost(userId, postId, previewLimit = 3) {
   if (!ok) {
     throw new AppError("Post not found", 404, "NOT_FOUND");
   }
+
+  await cacheDel(`post:*:${postId}`);
+  await cacheDel("feed:*");
+
 
   return getPostLikeSummary(postId, userId, previewLimit);
 }
@@ -24,6 +29,9 @@ export async function unlikePost(userId, postId, previewLimit = 3) {
   if (!ok) {
     throw new AppError("Post not found", 404, "NOT_FOUND");
   }
+
+  await cacheDel(`post:*:${postId}`);
+  await cacheDel("feed:*");
 
   return getPostLikeSummary(postId, userId, previewLimit);
 }

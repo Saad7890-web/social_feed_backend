@@ -13,6 +13,8 @@ import { buildCloudinaryImageUrl } from "../../utils/cloudinary-delivery.js";
 import { encodeCursor } from "../../utils/pagination.js";
 import { serializePost } from "../../utils/post-serializers.js";
 import { verifyCloudinaryUploadResult } from "../uploads/upload.service.js";
+import { getCachedFeed, getCachedPost, invalidatePostCaches, setCachedFeed, setCachedPost } from "./post.cache.js";
+
 
 function normalizeImage(image, visibility) {
   if (!image) return null;
@@ -48,7 +50,7 @@ function normalizeLikeSummary(row) {
 export async function createNewPost(userId, input) {
   const image = normalizeImage(input.image, input.visibility);
 
-  return withTransaction(async (client) => {
+  const post = await withTransaction(async (client) => {
     const post = await createPost(client, {
       authorId: userId,
       body: input.body,
@@ -58,10 +60,14 @@ export async function createNewPost(userId, input) {
 
     return serializePost(post);
   });
+
+  await invalidatePostCaches(post.id);
+
+  return post;
 }
 
 export async function editPost(userId, postId, input) {
-  return withTransaction(async (client) => {
+  const updated = await withTransaction(async (client) => {
     const existing = await findPostByIdForOwner(postId, userId);
 
     if (!existing) {
@@ -79,10 +85,14 @@ export async function editPost(userId, postId, input) {
 
     return serializePost(updated);
   });
+
+  await invalidatePostCaches(updated.id);
+
+  return updated;
 }
 
 export async function removePost(userId, postId) {
-  return withTransaction(async (client) => {
+  await withTransaction(async (client) => {
     const existing = await findPostByIdForOwner(postId, userId);
 
     if (!existing) {
@@ -90,17 +100,21 @@ export async function removePost(userId, postId) {
     }
 
     await deletePost(client, postId);
-    return true;
   });
+
+  await invalidatePostCaches(postId);
+
+  return true;
 }
 
 export async function getFeed(userId, { limit, cursor }) {
+  const cached = await getCachedFeed(userId, limit, cursor);
+  if (cached) return cached;
+
   const rows = await listFeedPosts({ userId, limit, cursor });
 
   const postIds = rows.map((row) => Number(row.id));
-  const likeRows = postIds.length > 0
-    ? await getPostLikeSummaries(postIds, userId, 3)
-    : [];
+  const likeRows = await getPostLikeSummaries(postIds, userId, 3);
 
   const likeMap = new Map(
     likeRows.map((row) => [Number(row.entity_id), normalizeLikeSummary(row)])
@@ -126,13 +140,15 @@ export async function getFeed(userId, { limit, cursor }) {
         })
       : null;
 
-  return {
-    posts,
-    nextCursor
-  };
+  const payload = { posts, nextCursor };
+  await setCachedFeed(userId, limit, cursor, payload);
+  return payload;
 }
 
 export async function getPostByIdForCurrentUser(userId, postId) {
+  const cached = await getCachedPost(userId, postId);
+  if (cached) return cached;
+
   const post = await findPostById(postId);
 
   if (!post) {
@@ -154,5 +170,7 @@ export async function getPostByIdForCurrentUser(userId, postId) {
       })
     : null;
 
-  return serializePost(post, likeSummary, imageUrl);
+  const payload = serializePost(post, likeSummary, imageUrl);
+  await setCachedPost(userId, postId, payload);
+  return payload;
 }
