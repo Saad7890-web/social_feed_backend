@@ -22,6 +22,12 @@ const envSchema = z.object({
   CLOUDINARY_FOLDER: z.string().min(1).default("social-feed"),
   MAX_IMAGE_SIZE_BYTES: z.coerce.number().int().positive().default(8 * 1024 * 1024),
 
+  REDIS_URL: z.string().min(1),
+  CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(30),
+  POST_CACHE_TTL_SECONDS: z.coerce.number().int().positive().default(60),
+  RATE_LIMIT_POINTS: z.coerce.number().int().positive().default(600),
+  RATE_LIMIT_DURATION_SECONDS: z.coerce.number().int().positive().default(900),
+
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info")
 });
 
