@@ -15,7 +15,9 @@ async function ensurePostAccessible(client, postId, userId) {
 
 async function ensureCommentAccessible(client, commentId, userId) {
   const result = await client.query(
-    `SELECT c.id, c.post_id, c.author_id, p.author_id AS post_author_id, p.visibility
+    `SELECT c.id, c.post_id, c.user_id, c.parent_comment_id, c.body,
+            c.reply_count, c.like_count, c.created_at, c.updated_at,
+            p.author_id AS post_author_id, p.visibility
      FROM comments c
      JOIN posts p ON p.id = c.post_id
      WHERE c.id = $1
