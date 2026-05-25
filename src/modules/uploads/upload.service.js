@@ -42,7 +42,7 @@ export function createCloudinaryUploadSignature({ userId, fileName, contentType,
     folder,
     public_id,
     type,
-    resource_type: "image"
+   
   };
 
   const signature = cloudinary.utils.api_sign_request(paramsToSign, env.CLOUDINARY_API_SECRET);

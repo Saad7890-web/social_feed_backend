@@ -1,6 +1,10 @@
 import bcrypt from "bcrypt";
 import { withTransaction } from "../../db/pool.js";
-import { createSession, revokeSessionByTokenHash } from "../../repositories/session.repository.js";
+import {
+  createSession,
+  findSessionByTokenHash,
+  revokeSessionByTokenHash
+} from "../../repositories/session.repository.js";
 import { createUser, findUserByEmail, findUserById } from "../../repositories/user.repository.js";
 import { AppError } from "../../utils/AppError.js";
 import { createSessionToken, hashSessionToken } from "../../utils/crypto.js";
