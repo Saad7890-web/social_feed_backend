@@ -14,17 +14,46 @@ const imageSchema = z
   .optional()
   .nullable();
 
-export const createPostSchema = z.object({
-  body: z.string().trim().min(1, "Post text is required").max(5000, "Post text is too long"),
-  visibility: z.enum(["public", "private"]).default("public"),
-  image: imageSchema
-});
+export const createPostSchema = z
+  .object({
+    body: z.string().trim().max(5000, "Post text is too long").optional(),
+    visibility: z.enum(["public", "private"]).default("public"),
+    image: imageSchema
+  })
+  .refine(
+    (data) => {
+      const hasText = !!data.body?.trim();
+      const hasImage = !!data.image;
 
-export const updatePostSchema = z.object({
-  body: z.string().trim().min(1, "Post text is required").max(5000, "Post text is too long").optional(),
-  visibility: z.enum(["public", "private"]).optional(),
-  image: imageSchema
-});
+      return hasText || hasImage;
+    },
+    {
+      message: "Post text or image is required",
+      path: ["body"]
+    }
+  );
+
+export const updatePostSchema = z
+  .object({
+    body: z.string().trim().max(5000, "Post text is too long").optional(),
+    visibility: z.enum(["public", "private"]).optional(),
+    image: imageSchema
+  })
+  .refine(
+    (data) => {
+      const hasText =
+        data.body === undefined ? true : !!data.body.trim();
+
+      const hasImage =
+        data.image === undefined ? true : !!data.image;
+
+      return hasText || hasImage;
+    },
+    {
+      message: "Post cannot be empty",
+      path: ["body"]
+    }
+  );
 
 export const feedQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
