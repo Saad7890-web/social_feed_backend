@@ -1,18 +1,15 @@
 import { RateLimiterRedis } from "rate-limiter-flexible";
 import { env } from "../config/env.js";
-import { getRedisClient, getRedisStatus } from "../config/redis.js";
-
-const limiters = new Map();
+import { getRedisClient } from "../config/redis.js";
 
 function getLimiter(prefix, points, duration) {
-  const cacheKey = `${prefix}:${points}:${duration}`;
-  const cached = limiters.get(cacheKey);
-  if (cached) return cached;
-
   const redis = getRedisClient();
-  if (!redis) return null;
 
-  const limiter = new RateLimiterRedis({
+  if (!redis) {
+    return null;
+  }
+
+  return new RateLimiterRedis({
     storeClient: redis,
     keyPrefix: prefix,
     points,
@@ -20,40 +17,19 @@ function getLimiter(prefix, points, duration) {
     inmemoryBlockOnConsumed: points + 1,
     insuranceLimiter: undefined
   });
-
-  limiters.set(cacheKey, limiter);
-  return limiter;
-}
-
-function rateLimitUnavailableResponse() {
-  return {
-    success: false,
-    error: {
-      code: "RATE_LIMITER_UNAVAILABLE",
-      message: "Service temporarily unavailable. Please try again later."
-    }
-  };
 }
 
 export function createRateLimiter({ prefix, points, duration }) {
+  const limiter = getLimiter(prefix, points, duration);
+
   return async function rateLimitMiddleware(req, res, next) {
-    const { ready } = getRedisStatus();
-    const limiter = getLimiter(prefix, points, duration);
+    if (!limiter) return next();
 
-    // Fail closed: if Redis-backed limiting is not ready, do not allow the
-    // request to bypass the limit entirely.
-    if (!limiter || !ready) {
-      return res.status(503).json(rateLimitUnavailableResponse());
-    }
-
-    const forwardedFor = req.headers["x-forwarded-for"];
-    const clientIp = Array.isArray(forwardedFor)
-      ? forwardedFor[0]
-      : String(forwardedFor || req.ip || "anonymous").split(",")[0].trim();
+    const key = req.ip || req.headers["x-forwarded-for"] || "anonymous";
 
     try {
-      await limiter.consume(clientIp);
-      return next();
+      await limiter.consume(String(key));
+      next();
     } catch {
       return res.status(429).json({
         success: false,
