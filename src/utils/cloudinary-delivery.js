@@ -10,11 +10,15 @@ export function buildCloudinaryImageUrl({
   const options = {
     secure: true,
     resource_type: "image",
-    type: deliveryType
+    type: deliveryType,
   };
 
   if (version) {
     options.version = version;
+  }
+
+  if (deliveryType === "authenticated") {
+    options.sign_url = true;
   }
 
   return cloudinary.url(publicId, options);
