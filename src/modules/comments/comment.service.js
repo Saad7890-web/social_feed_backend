@@ -1,15 +1,15 @@
+
 import { withTransaction } from "../../db/pool.js";
 import {
-    countDirectReplies,
-    createComment,
-    deleteCommentById,
-    findAccessiblePostById,
-    findCommentByIdForOwner,
-    findParentCommentForReply,
-    incrementPostCommentCount,
-    incrementReplyCount,
-    listReplies,
-    listTopLevelComments
+  createComment,
+  deleteCommentById,
+  findAccessiblePostById,
+  findCommentByIdForOwner,
+  findParentCommentForReply,
+  incrementPostCommentCount,
+  incrementReplyCount,
+  listReplies,
+  listTopLevelComments
 } from "../../repositories/comment.repository.js";
 import { getCommentLikeSummaries } from "../../repositories/like.repository.js";
 import { findPublicUsersByIds } from "../../repositories/user.repository.js";
@@ -78,7 +78,10 @@ export async function createTopLevelComment(userId, postId, body) {
 
 export async function createReply(userId, parentCommentId, body) {
   return withTransaction(async (client) => {
-    const parent = await findParentCommentForReply(parentCommentId, userId);
+    const parent = await findParentCommentForReply(parentCommentId, userId, {
+      client,
+      lock: true
+    });
 
     if (!parent) {
       throw new AppError("Comment not found", 404, "NOT_FOUND");
@@ -100,14 +103,18 @@ export async function createReply(userId, parentCommentId, body) {
 
 export async function removeComment(userId, commentId) {
   return withTransaction(async (client) => {
-    const comment = await findCommentByIdForOwner(commentId, userId);
+    const comment = await findCommentByIdForOwner(commentId, userId, {
+      client,
+      lock: true
+    });
 
     if (!comment) {
       throw new AppError("Comment not found", 404, "NOT_FOUND");
     }
 
     if (comment.parent_comment_id === null) {
-      const replyCount = await countDirectReplies(commentId);
+      const replyCount = Number(comment.reply_count || 0);
+
       await deleteCommentById(client, commentId);
       await incrementPostCommentCount(client, comment.post_id, -(1 + replyCount));
       return true;

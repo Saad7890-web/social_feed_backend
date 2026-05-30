@@ -1,4 +1,13 @@
+
 import { query } from "../db/pool.js";
+
+async function run(client, text, params) {
+  if (client) {
+    return client.query(text, params);
+  }
+
+  return query(text, params);
+}
 
 export async function findAccessiblePostById(postId, viewerId) {
   const result = await query(
@@ -41,13 +50,15 @@ export async function findAnyCommentById(commentId) {
   return result.rows[0] || null;
 }
 
-export async function findCommentByIdForOwner(commentId, userId) {
-  const result = await query(
+export async function findCommentByIdForOwner(commentId, userId, { client = null, lock = false } = {}) {
+  const result = await run(
+    client,
     `SELECT c.id, c.post_id, c.user_id, c.parent_comment_id, c.body, c.reply_count,
             c.like_count, c.created_at, c.updated_at
      FROM comments c
      WHERE c.id = $1
        AND c.user_id = $2
+     ${lock ? "FOR UPDATE OF c" : ""}
      LIMIT 1`,
     [commentId, userId]
   );
@@ -55,8 +66,9 @@ export async function findCommentByIdForOwner(commentId, userId) {
   return result.rows[0] || null;
 }
 
-export async function findParentCommentForReply(parentCommentId, viewerId) {
-  const result = await query(
+export async function findParentCommentForReply(parentCommentId, viewerId, { client = null, lock = false } = {}) {
+  const result = await run(
+    client,
     `SELECT c.id, c.post_id, c.user_id, c.parent_comment_id, c.body, c.reply_count,
             c.like_count, c.created_at, c.updated_at
      FROM comments c
@@ -64,6 +76,7 @@ export async function findParentCommentForReply(parentCommentId, viewerId) {
      WHERE c.id = $1
        AND c.parent_comment_id IS NULL
        AND (p.visibility = 'public' OR p.author_id = $2)
+     ${lock ? "FOR UPDATE OF c" : ""}
      LIMIT 1`,
     [parentCommentId, viewerId]
   );
