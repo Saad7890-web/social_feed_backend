@@ -42,16 +42,17 @@ export async function initRedis() {
     logger.error({ err }, "Redis error");
   });
 
-  connectPromise = redisClient.connect().catch((err) => {
-    logger.warn({ err }, "Redis unavailable, continuing without cache");
-    redisClient = null;
-    redisReady = false;
-    connectPromise = null;
-    return null;
-  });
+  connectPromise = redisClient.connect()
+    .then(() => redisClient)
+    .catch((err) => {
+      logger.warn({ err }, "Redis unavailable, continuing with memory fallback");
+      redisClient = null;
+      redisReady = false;
+      connectPromise = null;
+      return null;
+    });
 
-  await connectPromise;
-  return redisClient;
+  return connectPromise;
 }
 
 export function getRedisClient() {
